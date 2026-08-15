@@ -1,10 +1,12 @@
 1) create a new repo on github
 
+meta-openembedded-core
+
 2) add my-scripts dir
 
-cd meta-phytec
+cd meta-openembedded-core
 
-echo "# meta-phytec fork" >> README.md
+echo "# meta-openembedded-core fork" >> README.md
 
 git init
 
@@ -18,213 +20,98 @@ git push -u origin master
 
 3) use my repo
 
-mv meta-phytec meta-phytec.ori
-git clone git@github.com:RobertBerger/meta-phytec.git
+mv meta-openembedded-core meta-openembedded-core.ori
+git clone git@github.com:RobertBerger/meta-openembedded-core.git
 
 4) add upstream
 
-cd meta-phytec
+cd meta-openembedded-core
 
-git remote add official-upstream git://github.com/phytec/meta-phytec
+git remote add official-upstream https://github.com/openembedded/openembedded-core.git
 
 $ git fetch official-upstream
 
-warning: no common commits
-remote: Enumerating objects: 19497, done.
-remote: Counting objects: 100% (19497/19497), done.
-remote: Compressing objects: 100% (4931/4931), done.
-remote: Total 19497 (delta 14128), reused 18843 (delta 13474), pack-reused 0
-Receiving objects: 100% (19497/19497), 2.86 MiB | 6.63 MiB/s, done.
-Resolving deltas: 100% (14128/14128), done.
-From git://github.com/phytec/meta-phytec
- * [new branch]        1.8.1-phy2-fix  -> official-upstream/1.8.1-phy2-fix
- * [new branch]        1.8.1-phy6-fix  -> official-upstream/1.8.1-phy6-fix
- * [new branch]        dizzy           -> official-upstream/dizzy
- * [new branch]        dunfell         -> official-upstream/dunfell
- * [new branch]        fido            -> official-upstream/fido
- * [new branch]        gatesgarth      -> official-upstream/gatesgarth
- * [new branch]        hardknott       -> official-upstream/hardknott
- * [new branch]        jethro          -> official-upstream/jethro
- * [new branch]        krogoth         -> official-upstream/krogoth
- * [new branch]        master          -> official-upstream/master
- * [new branch]        morty           -> official-upstream/morty
- * [new branch]        pyro            -> official-upstream/pyro
- * [new branch]        rocko           -> official-upstream/rocko
- * [new branch]        sumo            -> official-upstream/sumo
- * [new branch]        thud            -> official-upstream/thud
- * [new branch]        warrior         -> official-upstream/warrior
- * [new branch]        zeus            -> official-upstream/zeus
- * [new tag]           1.7.3-phy1      -> 1.7.3-phy1
- * [new tag]           1.8.1-phy2-fix1 -> 1.8.1-phy2-fix1
- * [new tag]           1.8.1-phy6-fix1 -> 1.8.1-phy6-fix1
- * [new tag]           1.7.0-phy1      -> 1.7.0-phy1
- * [new tag]           1.7.0-phy2      -> 1.7.0-phy2
- * [new tag]           1.7.0-phy3      -> 1.7.0-phy3
- * [new tag]           1.7.2-phy1      -> 1.7.2-phy1
- * [new tag]           1.7.2-phy2      -> 1.7.2-phy2
- * [new tag]           1.8.1-phy1      -> 1.8.1-phy1
- * [new tag]           1.8.1-phy2      -> 1.8.1-phy2
- * [new tag]           1.8.1-phy3      -> 1.8.1-phy3
- * [new tag]           1.8.1-phy4      -> 1.8.1-phy4
- * [new tag]           1.8.1-phy5      -> 1.8.1-phy5
- * [new tag]           1.8.1-phy6      -> 1.8.1-phy6
- * [new tag]           1.8.1-phy7      -> 1.8.1-phy7
- * [new tag]           1.8.1-phy8      -> 1.8.1-phy8
- * [new tag]           2.0.1-phy1      -> 2.0.1-phy1
- * [new tag]           2.0.1-phy2      -> 2.0.1-phy2
- * [new tag]           2.0.1-phy3      -> 2.0.1-phy3
- * [new tag]           2.1.1-phy1      -> 2.1.1-phy1
- * [new tag]           2.1.1-phy2      -> 2.1.1-phy2
- * [new tag]           2.1.2-phy1      -> 2.1.2-phy1
-...
-
-$ git branch -a
-
+git branch -a
 * master
-  remotes/official-upstream/1.8.1-phy2-fix
-  remotes/official-upstream/1.8.1-phy6-fix
+  remotes/official-upstream/2011-1
+  remotes/official-upstream/daisy
+  remotes/official-upstream/danny
+  remotes/official-upstream/denzil
   remotes/official-upstream/dizzy
+  remotes/official-upstream/dora
   remotes/official-upstream/dunfell
+  remotes/official-upstream/dylan
   remotes/official-upstream/fido
   remotes/official-upstream/gatesgarth
   remotes/official-upstream/hardknott
+  remotes/official-upstream/honister
   remotes/official-upstream/jethro
+  remotes/official-upstream/kirkstone
   remotes/official-upstream/krogoth
+  remotes/official-upstream/langdale
   remotes/official-upstream/master
+  remotes/official-upstream/master-next
+  remotes/official-upstream/mickledore
   remotes/official-upstream/morty
+  remotes/official-upstream/nanbield
   remotes/official-upstream/pyro
   remotes/official-upstream/rocko
+  remotes/official-upstream/rocko-next
+  remotes/official-upstream/scarthgap
+  remotes/official-upstream/styhead
   remotes/official-upstream/sumo
   remotes/official-upstream/thud
+  remotes/official-upstream/walnascar
+  remotes/official-upstream/walnascar-next
   remotes/official-upstream/warrior
+  remotes/official-upstream/whinlatter
+  remotes/official-upstream/wrynose
   remotes/official-upstream/zeus
   remotes/origin/HEAD -> origin/master
   remotes/origin/master
+...
 
 $ git tag -l
+2011-1
+2018-10.4-thud
+2019-04.2-warrior
+2019-04.3-warrior
+2019-04.4-warrior
+2019-10.1-zeus
+2019-10.2-zeus
+2019-10.3-zeus
+2019-10.4-zeus
+2020-04.1-dunfell
+2020-04.2-dunfell
+2020-04.3-dunfell
+2020-04.4-dunfell
+2020-04.5-dunfell
+2020-04.6-dunfell
+2020-10.2
+2020-10.2-gatesgarth
+2020-10.3
+2020-10.3-gatesgarth
+uninative-1.0
+uninative-1.3
+uninative-1.4
+uninative-1.5
+uninative-1.6
+uninative-1.7
+uninative-1.8
+uninative-1.9
+uninative-2.0
+uninative-2.1
+uninative-2.10
 
-1.7.0-phy1
-1.7.0-phy2
-1.7.0-phy3
-1.7.2-phy1
-1.7.2-phy2
-1.7.3-phy1
-1.8.1-phy1
-1.8.1-phy2
-1.8.1-phy2-fix1
-1.8.1-phy3
-1.8.1-phy4
-1.8.1-phy5
-1.8.1-phy6
-1.8.1-phy6-fix1
-1.8.1-phy7
-1.8.1-phy8
-2.0.1-phy1
-2.0.1-phy2
-2.0.1-phy3
-2.1.1-phy1
-2.1.1-phy2
-2.1.2-phy1
-2.1.2-phy2
-2.1.2-phy3
-2.1.2-phy4
-2.1.2-phy5
-2.1.3-phy1
-2.1.3-phy2
-2.1.3-phy3
-2.1.3-phy4
-2.1.3-phy5
-2.1.3-phy6
-2.1.3-phy7
-2.1.3-phy8
-2.2.1-phy1
-2.2.1-phy2
-2.2.1-phy3
-2.2.1-phy4
-2.2.1-phy5
-2.2.1-phy6
-2.2.1-phy7
-2.2.1-phy8
-2.2.1-phy9
-2.2.2-phy1
-2.2.2-phy2
-2.2.2-phy3
+...
 
-Phytec uses this commit 3ba7567532bcda55d9d73deff80a350877b68d07 for the pd21.1.0-stm release
+5) use the master branch on a specific commit and make own branch
 
-$ git show 3ba7567532bcda55d9d73deff80a350877b68d07
-commit 3ba7567532bcda55d9d73deff80a350877b68d07
-Author: Christian Hemp <c.hemp@phytec.de>
-Date:   Fri Feb 19 16:51:04 2021 +0100
+git co official-upstream/master
 
-    fix phygate tauri machine name
-    
-    Update kernel and u-boot recipe to new phygate-tauri machine name.
-    
-    Signed-off-by: Christian Hemp <c.hemp@phytec.de>
-    Signed-off-by: Stefan Müller-Klieser <s.mueller-klieser@phytec.de>
+git co 2bb062e403c7093734de6467c49503a7d8970d9e
 
-diff --git a/dynamic-layers/freescale-layer/recipes-kernel/linux/linux-imx_5.4.70_2.3.0-phy3.bb b/dynamic-layers/freescale-layer/recipes-kernel/linux/linux-imx_5.4.70_2.3.0-phy3.bb
-index ea1fdbea..439f2a74 100644
---- a/dynamic-layers/freescale-layer/recipes-kernel/linux/linux-imx_5.4.70_2.3.0-phy3.bb
-+++ b/dynamic-layers/freescale-layer/recipes-kernel/linux/linux-imx_5.4.70_2.3.0-phy3.bb
-@@ -25,6 +25,6 @@ COMPATIBLE_MACHINE .= "|phyboard-polis-imx8mm-3"
- COMPATIBLE_MACHINE .= "|phyboard-polis-imx8mm-4"
- COMPATIBLE_MACHINE .= "|phyboard-polis-imx8mn-1"
- COMPATIBLE_MACHINE .= "|phyboard-pollux-imx8mp-1"
--COMPATIBLE_MACHINE .= "|phygate-tauri-imx8mm-1"
--COMPATIBLE_MACHINE .= "|phygate-tauri-imx8mm-2"
-+COMPATIBLE_MACHINE .= "|phygate-tauri-l-imx8mm-1"
-+COMPATIBLE_MACHINE .= "|phygate-tauri-l-imx8mm-2"
- COMPATIBLE_MACHINE .= ")$"
-diff --git a/recipes-bsp/u-boot/u-boot-imx_2020.04_2.3.0-phy2.bb b/recipes-bsp/u-boot/u-boot-imx_2020.04_2.3.0-phy2.bb
-index aae54cc5..0e33781e 100644
---- a/recipes-bsp/u-boot/u-boot-imx_2020.04_2.3.0-phy2.bb
-+++ b/recipes-bsp/u-boot/u-boot-imx_2020.04_2.3.0-phy2.bb
-@@ -51,8 +51,8 @@ COMPATIBLE_MACHINE .= "|phyboard-polis-imx8mm-3"
- COMPATIBLE_MACHINE .= "|phyboard-polis-imx8mm-4"
- COMPATIBLE_MACHINE .= "|phyboard-polis-imx8mn-1"
- COMPATIBLE_MACHINE .= "|phyboard-pollux-imx8mp-1"
--COMPATIBLE_MACHINE .= "|phygate-tauri-imx8mm-1"
--COMPATIBLE_MACHINE .= "|phygate-tauri-imx8mm-2"
-+COMPATIBLE_MACHINE .= "|phygate-tauri-l-imx8mm-1"
-+COMPATIBLE_MACHINE .= "|phygate-tauri-l-imx8mm-2"
- COMPATIBLE_MACHINE .= ")$"
- 
- UBOOT_NAME_mx8 = "u-boot-${MACHINE}.bin-${UBOOT_CONFIG}"
-
-5) use specific tag/commit and make own branch
-
-$ git co 3ba7567532bcda55d9d73deff80a350877b68d07
-Note: checking out '3ba7567532bcda55d9d73deff80a350877b68d07'.
-
-You are in 'detached HEAD' state. You can look around, make experimental
-changes and commit them, and you can discard any commits you make in this
-state without impacting any branches by performing another checkout.
-
-If you want to create a new branch to retain commits you create, you may
-do so (now or later) by using -b with the checkout command again. Example:
-
-  git checkout -b <new-branch-name>
-
-HEAD is now at 3ba75675 fix phygate tauri machine name
-
-$ git checkout -b 2021-06-09-3ba7567532bcda55d9d73deff80a350877b68d07-pd21.1.0-stm-dunfell
-Switched to a new branch '2021-06-09-3ba7567532bcda55d9d73deff80a350877b68d07-pd21.1.0-stm-dunfell'
-
-$ git branch
-* 2021-06-09-3ba7567532bcda55d9d73deff80a350877b68d07-pd21.1.0-stm-dunfell
-  master
-
-our hacked version of this branch (subset and modifications)
-
-$ git branch 2021-06-09-pd21.1.0-stm-dunfell-as-hardknott
-$ git co 2021-06-09-pd21.1.0-stm-dunfell-as-hardknott
-Switched to branch '2021-06-09-pd21.1.0-stm-dunfell-as-hardknott'
-$ git branch
-  2021-06-09-3ba7567532bcda55d9d73deff80a350877b68d07-pd21.1.0-stm-dunfell
-* 2021-06-09-pd21.1.0-stm-dunfell-as-hardknott
-  master
+git branch 2026-08-11-training
 
 #5) use specific upstream branch/commit and make own branch
 #
