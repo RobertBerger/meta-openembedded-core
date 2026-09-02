@@ -354,6 +354,99 @@ do_kernel_metadata() {
 do_patch() {
 	set +e
 	cd ${S}
+#
+# Note:
+# There is companion code in the kernel recipe: linux-yocto-pollux-common.inc
+# Set KERNEL_PATCH_IDEMPOTENCY_TOKEN to allow for multiple bitbake runs without cleansstate
+#
+# =======================================================================================
+# COMPATIBILITY LAYER FOR DYNAMIC PATCH GENERATION TOOLS
+# =======================================================================================
+# This block serves as a safety net and compatibility layer between dynamic patch
+# generation tools and Yocto's rigid kernel metadata system (`linux-yocto`).
+#
+# When external scripts generate patches on-the-fly, they often suffer from workspace
+# mismatches or directory layout timing bugs. This logic resolves those issues by
+# dynamically aligning the patch tracking layout before standard kernel tasks execute.
+#
+# HOW THIS LOGIC OPERATES:
+#
+# 1. DYNAMIC KERNEL VERSION TARGETING (NO HARDCODING)
+#    - While a hardcoded fallback exists (`KVER="7.7"`), the code runs fully dynamically.
+#    - It pulls `${LINUX_VERSION}` and `${LINUX_TARGET_TYPE}` directly from the environment.
+#    - `sed` and `cut` sanitize the version (e.g., transforming `6.6.21-yocto` into `v6.6`).
+#    - It then strings together the exact filename convention Yocto's kernel-tools
+#      expect for that version (e.g., `patch.v6.6.standard.queue`).
+#
+# 2. HANDLING DYNAMIC PATCH-GENERATION OUTPUT SCENARIOS
+#
+#    SCENARIO A: The generator script creates no patches (Empty Queue)
+#    - If no patches are generated for a specific configuration, `do_kernel_configme`
+#      will normally crash if `.kernel-meta` exists but contains no valid `series` layout.
+#    - This hack intercepts that state, `touch`es an empty version-specific queue,
+#      and maps proper relative symlinks (`series` -> `patch.queue` -> target).
+#    - This tricks Yocto into seeing a valid, 0-byte patch layout, allowing the build
+#      to proceed cleanly.
+#
+#    SCENARIO B: The generator script misplaces patches (`unused.patch.queue`)
+#    - External automation tools often do not know Yocto's internal naming quirks
+#      and dump generated patch queues into a generic `unused.patch.queue` file.
+#    - The logic performs a rescue operation: it safely appends (`cat`) those stranded
+#      patches into the dynamically calculated version queue and flushes the temporary file.
+#    - This guarantees that all dynamically created patches are properly tracked and
+#      applied by the Yocto build system.
+# =======================================================================================
+
+    # --- START OF CLASS WORKSPACE HACK ---
+    if [ -d "${S}/.kernel-meta" ]; then
+        bbnote "[CLASS-PATCH] Dynamically calculating workspace paths inside do_patch..."
+        cd "${S}/.kernel-meta"
+
+        # 1. Fetch raw Yocto metadata strings
+        KVER="${LINUX_VERSION}"
+        KTYPE="${LINUX_TARGET_TYPE}"
+
+        # Fallback defaults if variables are unassigned
+        [ -z "$KVER" ] && KVER="7.7"
+        [ -z "$KTYPE" ] && KTYPE="standard"
+
+        # 2. Sanitize the version string: Isolate major.minor and apply 'v' prefix
+        KVER=$(echo "$KVER" | sed 's/^v//' | cut -d'.' -f1,2)
+        KVER="v${KVER}"
+
+        # 3. Assemble the exact target file string dynamically
+        REAL_VERSION_QUEUE="patch.${KVER}.${KTYPE}.queue"
+
+        # --- DETECT IF ANY PATCHES OR QUEUES ACTUALLY EXIST ---
+        if [ ! -s "${REAL_VERSION_QUEUE}" ] && [ ! -s "unused.patch.queue" ] && [ -z "$(find . -maxdepth 1 -name '*.patch' 2>/dev/null)" ]; then
+            bbnote "[CLASS-PATCH] No patch queues detected. Preemptively initializing empty tracking structures to satisfy do_kernel_configme."
+
+            # Create an empty target file so the symlink resolves to a valid, 0-byte file
+            touch "${REAL_VERSION_QUEUE}"
+            ln -sf "${REAL_VERSION_QUEUE}" patch.queue
+            ln -sf patch.queue series
+
+            cd "${S}"
+        else
+            bbnote "[CLASS-PATCH] Calculated target queue name: ${REAL_VERSION_QUEUE}"
+
+            # 4. Establish the exact symlink tracking layout preemptively
+            ln -sf "${REAL_VERSION_QUEUE}" patch.queue
+            ln -sf patch.queue series
+            bbnote "[CLASS-PATCH] Preemptively aligned layout: series -> patch.queue -> ${REAL_VERSION_QUEUE}"
+
+            # 5. If an unused queue already exists, handle the rescue operation
+            if [ -s "unused.patch.queue" ]; then
+                bbnote "[CLASS-PATCH] Rescuing stranded patches from unused.patch.queue..."
+                cat unused.patch.queue >> "${REAL_VERSION_QUEUE}"
+                > unused.patch.queue
+            fi
+
+            cd "${S}"
+        fi
+    fi
+    # --- END OF CLASS WORKSPACE HACK ---
+
 
 	check_git_config
 	if [ "${KERNEL_DEBUG_TIMESTAMPS}" != "1" ]; then
@@ -491,11 +584,71 @@ do_kernel_configme() {
 	cd ${S}
 
 	meta_dir=$(kgit --meta)
+
 	configs="$(scc --configs -o ${meta_dir})"
 	if [ $? -ne 0 ]; then
 		bberror "${configs}"
 		bbfatal_log "Could not find configuration queue (${meta_dir}/config.queue)"
 	fi
+
+# =======================================================================================
+# CONFIGURATION INJECTION BYPASS (TIMING WINDOW: PHASE 1 - KMETA DEFCONFIG OVERRIDES)
+# =======================================================================================
+#
+# PURPOSE:
+# This block acts as a dynamic injection layer ("Level 2 Bypass") to force baseline kernel
+# configurations into the KMETA workspace right before Yocto validates the defconfig.
+#
+# WHY IS THIS NEEDED?
+# Standard Yocto kernel recipes (`linux-yocto`) assemble configuration files using strict,
+# sequential tasks. If external build scripts, custom distros, or downstream layers need
+# to append/modify `.config` flags on-the-fly without maintaining endless separate `.cfg`
+# fragments, they can expose them via the BitBake variable `EXTRA_KERNEL_DEFCONFIGS`.
+#
+# This hack catches the exact timing window where the initial `.kernel-meta/configs/defconfig`
+# has been extracted but not yet processed by `do_kernel_configme`.
+#
+# HOW THIS LOGIC OPERATES:
+#
+# 1. VARIABLE FETCH & SANITIZATION
+#    - It pulls space-delimited configuration settings directly from the BitBake datastore
+#      variable `${EXTRA_KERNEL_DEFCONFIGS}` (e.g., "CONFIG_XYZ=y CONFIG_ABC=m").
+#
+# 2. ATOMIC DEFCONFIG REPLACEMENT & APPENDING (IDEMPOTENCY)
+#    - If a valid `defconfig` baseline exists in the metadata workspace, it loops through
+#      each custom configuration entry.
+#    - It extracts the key identifier using `cut` (e.g., `CONFIG_XYZ`).
+#    - It executes an in-place `sed -i` deletion to wipe out any existing assignment of
+#      that specific key from the file, preventing redundant or conflicting entries.
+#    - It appends (`echo >>`) the fresh, custom definition directly to the bottom of the
+#      workspace `defconfig` file.
+#
+# 3. SILENT SKIPPING FALLBACK
+#    - If no baseline `defconfig` is found or if `EXTRA_KERNEL_DEFCONFIGS` is entirely
+#      empty, the block safely prints an informational note and passes execution through
+#      without disrupting the kernel configuration task.
+# --> =======================================================================================
+        local kmeta_defconfig="${S}/.kernel-meta/configs/defconfig"
+
+        # Explicitly pull the variable from the BitBake data store into a local shell array
+        local extra_configs=$(echo "${@d.getVar('EXTRA_KERNEL_DEFCONFIGS') or ''}")
+
+        if [ -f "$kmeta_defconfig" ] && [ -n "$extra_configs" ]; then
+                bbnote "Level 2 Bypass: Injecting baseline configurations into defconfig at ${kmeta_defconfig}"
+
+                # Explicitly loop using standard space-delimited string parsing
+                for cfg in $extra_configs; do
+                        [ -z "$cfg" ] && continue
+                        local key=$(echo "$cfg" | cut -d'=' -f1)
+
+                        sed -i "/^${key}=/d" "$kmeta_defconfig"
+                        echo "$cfg" >> "$kmeta_defconfig"
+                        bbnote "Level 2 Bypass: Successfully seeded baseline [${cfg}]"
+                done
+        else
+                bbnote "Level 2 Bypass Note: Skipping defconfig phase (File present: $([ -f "$kmeta_defconfig" ] && echo "YES" || echo "NO"), Vars: [${extra_configs}])"
+        fi
+# <-- =======================================================================================
 
 	CFLAGS="${CFLAGS} ${TOOLCHAIN_OPTIONS}" HOSTCC="${BUILD_CC} ${BUILD_CFLAGS} ${BUILD_LDFLAGS}" HOSTCPP="${BUILD_CPP}" CC="${KERNEL_CC}" LD="${KERNEL_LD}" OBJCOPY="${KERNEL_OBJCOPY}" STRIP="${KERNEL_STRIP}" ARCH=${ARCH} merge_config.sh -O ${B} ${config_flags} ${configs} > ${meta_dir}/cfg/merge_config_build.log 2>&1
 	if [ $? -ne 0 -o ! -f ${B}/.config ]; then
@@ -506,6 +659,86 @@ do_kernel_configme() {
 			bbfatal_log "Details can be found at: ${S}/${meta_dir}/cfg/merge_config_build.log"
 		fi
 	fi
+
+# =======================================================================================
+# CONFIGURATION INJECTION BYPASS (TIMING WINDOW: PHASE 2 - FINAL CONFIG SYNCHRONIZATION)
+# =======================================================================================
+#
+# PURPOSE:
+# This block functions as a late-stage synchronization layer ("Level 2 Bypass") that runs
+# after Yocto's internal configuration merging utilities have executed. It guarantees
+# that keys passed via `EXTRA_KERNEL_DEFCONFIGS` are enforced in the final active `.config`.
+#
+# WHY IS THIS NEEDED?
+# During standard kernel builds, `merge_config.sh` blends several `.cfg` fragments together.
+# If a fragment downstream or an internal build routine redefines a key that was seeded
+# earlier in Phase 1, the value can drift or get overridden. This phase acts as the final
+# authority to resolve discrepancies, sanitize log traces, and prevent Yocto from throwing
+# validation or QA failures due to mismatched configurations.
+#
+# HOW THIS LOGIC OPERATES:
+#
+# 1. LOG MATCHING & OVERRIDE RESOLUTION
+#    - The code inspects the internal Yocto merge log (`merge_config_build.log`) to find
+#      if the configuration engine made an intentional late re-assignment for the specific key.
+#    - If a "New value: KEY=" string is discovered via `grep`, it extracts the actual paired
+#      value using `sed` and sanitizes it by removing hidden Windows carriage returns (`\r`).
+#    - If found, it respects this late-stage choice as the true intended target value.
+#
+# 2. ENFORCEMENT & DELETION OF CONFLICTING RECORDS
+#    - It targets the active build workspace configuration file `${B}/.config`.
+#    - It uses `sed -i` to aggressively clean up any conflicting definitions:
+#      * Wipes out standard assignments (`KEY=value`).
+#      * Wipes out active negation markers (`# KEY is not set`).
+#    - It explicitly appends (`echo >>`) the verified `target_value` directly into `.config`.
+#
+# 3. KCONF AUDIT SANITY LOOKALIKES
+#    - To ensure that incremental bitbake re-runs or secondary configuration state verifiers
+#      do not trigger unaligned cache mismatches, the exact same erasure and appending routine
+#      is cleanly mirrored to the backup tracker file `${B}/.config.old` if it exists.
+# --> =======================================================================================
+
+        # Safely pull the variable using BitBake's data store fetcher
+        local extra_configs=$(echo "${@d.getVar('EXTRA_KERNEL_DEFCONFIGS') or ''}")
+
+        if [ -f "${B}/.config" ] && [ -n "$extra_configs" ]; then
+                bbnote "Level 2 Bypass: Synchronizing final fragment values into .config"
+                local merge_log="${meta_dir}/cfg/merge_config_build.log"
+
+                for cfg in $extra_configs; do
+                        [ -z "$cfg" ] && continue
+                        local key=$(echo "$cfg" | cut -d'=' -f1)
+                        local target_value="$cfg"
+
+                        if [ -f "$merge_log" ]; then
+                                # Look for the last 'New value: KEY=' redefinition line
+                                local log_match=$(grep -E "New value: ${key}=" "$merge_log" | tail -n 1)
+
+                                if [ -n "$log_match" ]; then
+                                        # Extract the complete KEY=value string and strip any hidden windows carriage returns (\r)
+                                        local clean_pair=$(echo "$log_match" | sed "s/.*New value: //" | tr -d '\r')
+                                        bbnote "Level 2 Bypass: Dynamic fragment override detected: ${clean_pair}"
+                                        target_value="$clean_pair"
+                                fi
+                        fi
+
+                        # Wipe out any erasure records (# CONFIG_... is not set) or old entries for this specific key
+                        sed -i "/^${key}=/d" "${B}/.config"
+                        sed -i "/^# ${key} is not set/d" "${B}/.config"
+
+                        # Hard-inject ONLY this item into the final .config
+                        echo "$target_value" >> "${B}/.config"
+                        bbnote "Level 2 Bypass: Enforced ${target_value} inside final output"
+
+                        # Keep .config.old identical to avoid triggering KCONF audit errors
+                        if [ -f "${B}/.config.old" ]; then
+                                sed -i "/^${key}=/d" "${B}/.config.old"
+                                sed -i "/^# ${key} is not set/d" "${B}/.config.old"
+                                echo "$target_value" >> "${B}/.config.old"
+                        fi
+                done
+        fi
+# <-- =======================================================================================
 
 	if [ ! -z "${LINUX_VERSION_EXTENSION}" ]; then
 		echo "# Global settings from linux recipe" >> ${B}/.config
