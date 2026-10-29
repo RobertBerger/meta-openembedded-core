@@ -102,7 +102,29 @@ IMAGE_CMD:wic () {
 		esac
 		shift
 	done
-	mv "$build_wic/$(basename "${wks%.wks}")"*.${IMAGER} "$out.wic"
+
+	# meta-freescale uses aggressive variable expanding:
+	# When meta-freescale overrides are applied to dynamic variables (like using different hardware boot containers for variations of the imx8mp),
+	# the class system parses a .wks.in template down to a highly detailed temporary path.
+	# This mismatch forces a filename change inside OpenEmbedded that the core wic compiler does not replicate when naming its binary artifact output.
+
+	# replaced:
+
+	#mv "$build_wic/$(basename "${wks%.wks}")"*.${IMAGER} "$out.wic"
+
+	# with:
+
+	# Look for the generated binary image by its extension inside the isolated build-wic directory
+	discovered_file=$(ls -1 "$build_wic"/*.${IMAGER} 2>/dev/null | head -n 1)
+
+	if [ -f "$discovered_file" ]; then
+		# Explicitly target the full deployment path destination variables natively
+		target_destination="${IMGDEPLOYDIR}/${IMAGE_NAME}.wic"
+		echo "[WIC-CLASS-FIX] Natively mapping output disk image: $discovered_file -> $target_destination"
+		mv "$discovered_file" "$target_destination"
+	else
+		bbfatal "[WIC-CLASS-FIX] Error: No raw generated *.${IMAGER} target images were found inside $build_wic/"
+	fi
 }
 IMAGE_CMD:wic[vardepsexclude] = "WKS_FULL_PATH WKS_FILES TOPDIR"
 SPDX_IMAGE_PURPOSE:wic = "diskImage"
