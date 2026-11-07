@@ -44,6 +44,28 @@
 #   OVERLAYFS_MOUNT_POINT[mnt-overlay] = "/mnt/overlay"
 #   OVERLAYFS_WRITABLE_PATHS[mnt-overlay] = "/usr/share/another-application"
 #
+# To support extra mount options this file and the template meta/files/overlayfs-unit.mount.in
+# we hacked. Please note that it's backwards compatible.
+#
+# Security measure (custom hack):
+# Mount overlays with nosuid,nodev,noexec where possible
+# Prevents execution of rogue binaries and unauthorized SUID escalation.
+#
+# /home with nosuid,nodev,noexec:
+# genericoverlaystorage is a persistent partition (survives rauc update)
+# OVERLAYFS_MOUNT_POINT[genericoverlaystorage] = "/mnt/genericoverlay"
+# OVERLAYFS_WRITABLE_PATHS[genericoverlaystorage] = "/home"
+# OVERLAYFS_QA_SKIP[genericoverlaystorage] = "mount-configured"
+# OVERLAYFS_EXTRA_MOUNT_OPTIONS[genericoverlaystorage] = "nosuid,nodev,noexec"
+#
+# /var with nosuid,nodev not to break Docker/Podman
+# genericoverlaystorage is persistent until the next rauc update
+# OVERLAYFS_MOUNT_POINT[artifacts-storage] = "/mnt/artifacts"
+# OVERLAYFS_WRITABLE_PATHS[artifacts-storage] = "/var"
+# OVERLAYFS_QA_SKIP[artifacts-storage] = "mount-configured"
+# OVERLAYFS_EXTRA_MOUNT_OPTIONS[artifacts-storage] = "nosuid,nodev"
+#
+#
 # If your recipe deploys a systemd service, then it should require and be
 # started after the ${PN}-overlays.service to make sure that all overlays are
 # mounted beforehand.
@@ -66,11 +88,17 @@ python do_create_overlayfs_units() {
     with open(d.getVar("OVERLAYFS_ALL_OVERLAYS_TEMPLATE"), "r") as f:
         AllOverlaysTemplate = f.read()
 
-    def prepareUnits(data, lower):
+    def prepareUnits(data, lower, mountPoint):
+        # Look up the configuration flag string matching your storage mount identifier
+        extra_opts = d.getVarFlag('OVERLAYFS_EXTRA_MOUNT_OPTIONS', mountPoint) or ""
+        if extra_opts:
+            extra_opts = "," + extra_opts.strip(",")
+
         args = {
             'DATA_MOUNT_POINT': data,
             'DATA_MOUNT_UNIT': mountUnitName(data),
             'LOWERDIR': lower,
+            'EXTRA_MOUNT_OPTIONS': extra_opts,
         }
 
         bb.debug(1, "Generate systemd unit %s" % mountUnitName(lower))
@@ -99,7 +127,7 @@ python do_create_overlayfs_units() {
         for lower in lowerList.split():
             bb.debug(1, "Prepare mount unit for %s with data mount point %s" %
                      (lower, d.getVarFlag('OVERLAYFS_MOUNT_POINT', mountPoint)))
-            prepareUnits(d.getVarFlag('OVERLAYFS_MOUNT_POINT', mountPoint), lower)
+            prepareUnits(d.getVarFlag('OVERLAYFS_MOUNT_POINT', mountPoint), lower, mountPoint)
             mountUnitList.append(mountUnitName(lower))
 
     # set up one unit, which depends on all mount units, so users can set
@@ -128,5 +156,5 @@ do_install:append() {
     done
 }
 
-do_create_overlayfs_units[vardeps] += "OVERLAYFS_WRITABLE_PATHS"
+do_create_overlayfs_units[vardeps] += "OVERLAYFS_WRITABLE_PATHS OVERLAYFS_EXTRA_MOUNT_OPTIONS"
 addtask create_overlayfs_units before do_install
